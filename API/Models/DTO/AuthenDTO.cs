@@ -1,0 +1,8 @@
+﻿namespace NET_base.Models.DTO
+{
+    public class AuthenDTO
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+    }
+}
