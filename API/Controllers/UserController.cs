@@ -22,7 +22,7 @@ namespace API.Controllers
         [HttpGet]
         public async Task<Response<PagedResult<User>>> GetUsers([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
-            var usersQuery = _context.Users.AsQueryable();
+            var usersQuery = _context.Users;
 
             var totalItems = await usersQuery.CountAsync();
             var users = await usersQuery

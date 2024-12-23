@@ -22,6 +22,11 @@ public class JwtMiddleware
             {
                 // Attach the user ID to the HttpContext
                 context.Items["UserId"] = userId;
+            } else
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsync("Unauthorized");
+                return;
             }
         }
 

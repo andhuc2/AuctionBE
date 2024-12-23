@@ -23,7 +23,58 @@ namespace API.Controllers
         [HttpGet]
         public async Task<Response<PagedResult<Item>>> GetItems([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
-            var itemsQuery = _context.Items.AsQueryable();
+            var itemsQuery = _context.Items;
+
+            var totalItems = await itemsQuery.CountAsync();
+            var items = await itemsQuery
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            return new Response<PagedResult<Item>>(
+                true,
+                "Items fetched successfully.",
+                new PagedResult<Item>
+                {
+                    Queryable = items.AsQueryable(),
+                    RowCount = totalItems,
+                    CurrentPage = page,
+                    PageSize = size
+                });
+        }
+
+        // GET: api/Item
+        [HttpGet("person")]
+        [Authorize]
+        public async Task<Response<PagedResult<Item>>> GetItemsPerson([FromQuery] int page = 1, [FromQuery] int size = 10)
+        {
+            int userId = JwtMiddleware.GetUserId(HttpContext);
+
+            var itemsQuery = _context.Items.Where(i => i.SellerId == userId);
+
+            var totalItems = await itemsQuery.CountAsync();
+            var items = await itemsQuery
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            return new Response<PagedResult<Item>>(
+                true,
+                "Items fetched successfully.",
+                new PagedResult<Item>
+                {
+                    Queryable = items.AsQueryable(),
+                    RowCount = totalItems,
+                    CurrentPage = page,
+                    PageSize = size
+                });
+        }
+
+        // GET: api/Item
+        [HttpGet("home")]
+        public async Task<Response<PagedResult<Item>>> GetItemsHome([FromQuery] int page = 1, [FromQuery] int size = 10)
+        {
+            var itemsQuery = _context.Items;
 
             var totalItems = await itemsQuery.CountAsync();
             var items = await itemsQuery
@@ -64,7 +115,6 @@ namespace API.Controllers
             try
             {
                 int userId = JwtMiddleware.GetUserId(HttpContext);
-                if (userId == null || userId < 1) throw new Exception("Need login first!");
 
                 newItem.SellerId = userId;
 

@@ -104,10 +104,12 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseCors("AllowAll");
 
 app.UseMiddleware<JwtMiddleware>();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>
@@ -119,7 +121,5 @@ app.UseSwaggerUI(c =>
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-
-app.UseCors("AllowAll");
 
 app.Run();

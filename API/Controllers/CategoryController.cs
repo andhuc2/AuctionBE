@@ -22,7 +22,7 @@ namespace API.Controllers
         [HttpGet]
         public async Task<Response<PagedResult<Category>>> GetCategories([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
-            var categoriesQuery = _context.Categories.AsQueryable();
+            var categoriesQuery = _context.Categories;
 
             var totalItems = await categoriesQuery.CountAsync();
             var categories = await categoriesQuery
