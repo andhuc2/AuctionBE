@@ -26,6 +26,7 @@ namespace API.Controllers
             var itemsQuery = _context.Items;
 
             var totalItems = await itemsQuery.CountAsync();
+            var pageCount = (int)Math.Ceiling((double)totalItems / size);
             var items = await itemsQuery
                 .Skip((page - 1) * size)
                 .Take(size)
@@ -39,11 +40,12 @@ namespace API.Controllers
                     Queryable = items.AsQueryable(),
                     RowCount = totalItems,
                     CurrentPage = page,
-                    PageSize = size
+                    PageSize = size,
+                    PageCount = pageCount
                 });
         }
 
-        // GET: api/Item
+        // GET: api/Item/person
         [HttpGet("person")]
         [Authorize]
         public async Task<Response<PagedResult<Item>>> GetItemsPerson([FromQuery] int page = 1, [FromQuery] int size = 10)
@@ -53,6 +55,7 @@ namespace API.Controllers
             var itemsQuery = _context.Items.Where(i => i.SellerId == userId);
 
             var totalItems = await itemsQuery.CountAsync();
+            var pageCount = (int)Math.Ceiling((double)totalItems / size);
             var items = await itemsQuery
                 .Skip((page - 1) * size)
                 .Take(size)
@@ -66,42 +69,82 @@ namespace API.Controllers
                     Queryable = items.AsQueryable(),
                     RowCount = totalItems,
                     CurrentPage = page,
-                    PageSize = size
+                    PageSize = size,
+                    PageCount = pageCount
                 });
         }
 
-        // GET: api/Item
+        // GET: api/Item/home
         [HttpGet("home")]
-        public async Task<Response<PagedResult<Item>>> GetItemsHome([FromQuery] int page = 1, [FromQuery] int size = 10)
+        public async Task<Response<PagedResult<Item>>> GetItemsHome(
+            [FromQuery] int page = 1,
+            [FromQuery] int size = 10,
+            [FromQuery] string? search = null,
+            [FromQuery] int? categoryId = null)
         {
-            var itemsQuery = _context.Items;
+            try
+            {
+                var itemsQuery = _context.Items.AsQueryable();
 
-            var totalItems = await itemsQuery.CountAsync();
-            var items = await itemsQuery
-                .Skip((page - 1) * size)
-                .Take(size)
-                .ToListAsync();
-
-            return new Response<PagedResult<Item>>(
-                true,
-                "Items fetched successfully.",
-                new PagedResult<Item>
+                // Apply category filter if categoryId is provided
+                if (categoryId.HasValue && categoryId > 0)
                 {
-                    Queryable = items.AsQueryable(),
-                    RowCount = totalItems,
-                    CurrentPage = page,
-                    PageSize = size
-                });
+                    itemsQuery = itemsQuery.Where(item => item.CategoryId == categoryId.Value);
+                }
+
+                // Apply search filter if search term is provided
+                if (!string.IsNullOrEmpty(search))
+                {
+                    itemsQuery = itemsQuery.Where(item => item.Title.ToLower().Contains(search.ToLower()) || item.Description.ToLower().Contains(search.ToLower()));
+                }
+
+                var totalItems = await itemsQuery.CountAsync();
+                var pageCount = (int)Math.Ceiling((double)totalItems / size);
+
+                var items = await itemsQuery
+                    .Skip((page - 1) * size)
+                    .Take(size)
+                    .ToListAsync();
+
+                return new Response<PagedResult<Item>>(
+                    true,
+                    "Items fetched successfully.",
+                    new PagedResult<Item>
+                    {
+                        Queryable = items.AsQueryable(),
+                        RowCount = totalItems,
+                        CurrentPage = page,
+                        PageSize = size,
+                        PageCount = pageCount
+                    });
+            } catch (Exception ex)
+            {
+                return new Response<PagedResult<Item>>(false, Constant.FAIL_MESSAGE, null);
+            }
         }
+
 
         // GET: api/Item/{id}
         [HttpGet("{id}")]
         public async Task<Response<Item>> GetItemById(int id)
         {
-            var item = await _context.Items.FindAsync(id);
+            var item = await _context.Items.Include(i => i.Bids).Include(i => i.Seller).FirstOrDefaultAsync(i => i.Id == id);
             if (item == null)
             {
                 return new Response<Item>(false, "Item not found", null);
+            }
+
+            item.Seller.Bids = null;
+            item.Seller.Notifications = null;
+            item.Seller.RatingRatees = null;
+            item.Seller.RatingRaters = null;
+            item.Seller.Items = null;
+            item.Seller.Password = null;
+
+            foreach (var bid in item?.Bids)
+            {
+                bid.Item = null;
+                bid.Bidder.Password = null;
             }
 
             return new Response<Item>(true, "Item fetched successfully.", item);
