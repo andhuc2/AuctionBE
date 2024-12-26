@@ -47,6 +47,11 @@ namespace API.Controllers
                     return new Response<string>(false, "Invalid username or password", null);
                 }
 
+                if (user.IsDeleted == true)
+                {
+                    return new Response<string>(false, "You hase been banned!", null);
+                }
+
                 var token = GenerateJwtToken(user);
                 return new Response<string>(true, Constant.SUCCESS_MESSAGE, token);
             }

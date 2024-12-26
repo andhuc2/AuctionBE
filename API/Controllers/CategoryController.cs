@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using NET_base.Models.Common;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Dynamic.Core;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API.Controllers
 {
@@ -20,6 +21,7 @@ namespace API.Controllers
 
         // GET: api/Category
         [HttpGet]
+        [Authorize("Admin")]
         public async Task<Response<PagedResult<Category>>> GetCategories([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
             var categoriesQuery = _context.Categories;
@@ -46,7 +48,7 @@ namespace API.Controllers
         [HttpGet("all")]
         public async Task<Response<List<Category>>> GetAllCategories()
         {
-            var categories = await _context.Categories.ToListAsync();
+            var categories = await _context.Categories.Where(c => c.CreatedAt != null).ToListAsync();
 
             return new Response<List<Category>>(
                 true,
@@ -56,6 +58,7 @@ namespace API.Controllers
 
         // GET: api/Category/{id}
         [HttpGet("{id}")]
+        [Authorize("Admin")]
         public async Task<Response<Category>> GetCategoryById(int id)
         {
             var category = await _context.Categories
@@ -71,8 +74,9 @@ namespace API.Controllers
             return new Response<Category>(true, "Category fetched successfully.", category);
         }
 
-        /*// POST: api/Category
+        // POST: api/Category
         [HttpPost]
+        [Authorize("Admin")]
         public async Task<Response<bool>> AddCategory(Category newCategory)
         {
             try
@@ -89,6 +93,7 @@ namespace API.Controllers
 
         // PUT: api/Category
         [HttpPut]
+        [Authorize("Admin")]
         public async Task<Response<bool>> UpdateCategory(Category updatedCategory)
         {
             var category = await _context.Categories.FindAsync(updatedCategory.Id);
@@ -111,6 +116,33 @@ namespace API.Controllers
             {
                 return new Response<bool>(false, $"Error updating category: {ex.Message}", false);
             }
-        }*/
+        }
+
+        // DELETE: api/Category/{id}
+        [HttpDelete("{id}")]
+        [Authorize("Admin")]
+        public async Task<Response<bool>> DeleteCategory(int id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null)
+            {
+                return new Response<bool>(false, "Category not found", false);
+            }
+
+            category.CreatedAt = null; // Soft delete by setting CreatedAt to null
+
+            try
+            {
+                _context.Categories.Update(category);
+                await _context.SaveChangesAsync();
+                return new Response<bool>(true, "Category deleted successfully.", true);
+            }
+            catch (Exception ex)
+            {
+                return new Response<bool>(false, $"Error deleting category: {ex.Message}", false);
+            }
+        }
+
+
     }
 }

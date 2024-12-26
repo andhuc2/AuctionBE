@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using NET_base.Models.Common;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Dynamic.Core;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API.Controllers
 {
@@ -20,6 +21,7 @@ namespace API.Controllers
 
         // GET: api/User
         [HttpGet]
+        [Authorize("Admin")]
         public async Task<Response<PagedResult<User>>> GetUsers([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
             var usersQuery = _context.Users;
@@ -44,6 +46,7 @@ namespace API.Controllers
 
         // GET: api/User/{id}
         [HttpGet("{id}")]
+        [Authorize("Admin")]
         public async Task<Response<User>> GetUserById(int id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -57,6 +60,7 @@ namespace API.Controllers
 
         // POST: api/User
         [HttpPost]
+        [Authorize("Admin")]
         public async Task<Response<bool>> AddUser(User newUser)
         {
             try
@@ -73,6 +77,7 @@ namespace API.Controllers
 
         // PUT: api/User
         [HttpPut]
+        [Authorize("Admin")]
         public async Task<Response<bool>> UpdateUser(User updatedUser)
         {
             var user = await _context.Users.FindAsync(updatedUser.Id);
@@ -104,6 +109,7 @@ namespace API.Controllers
 
         // DELETE: api/User/{id} - Soft delete
         [HttpDelete("{id}")]
+        [Authorize("Admin")]
         public async Task<Response<bool>> DeleteUser(int id)
         {
             var user = await _context.Users.FindAsync(id);
