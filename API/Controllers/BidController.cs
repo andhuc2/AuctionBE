@@ -132,7 +132,7 @@ namespace API.Controllers
                     return new Response<bool>(false, $"Bid amount must be higher than the current highest bid of ${highestBid.BidAmount}.", false);
                 }
 
-                if (newBid.BidAmount < highestBid.BidAmount + item.BidIncrement)
+                if (highestBid != null && newBid.BidAmount < highestBid.BidAmount + item.BidIncrement)
                 {
                     return new Response<bool>(false, $"Bid amount must be higher with increment amount: ${item.BidIncrement}.", false);
                 }

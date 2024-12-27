@@ -184,16 +184,14 @@ namespace API.Controllers
 
             item.Title = updatedItem.Title;
             item.Description = updatedItem.Description;
-            item.SellerId = updatedItem.SellerId;
             item.CategoryId = updatedItem.CategoryId;
-            item.ImagePath = updatedItem.ImagePath;
-            item.DocumentPath = updatedItem.DocumentPath;
             item.MinimumBid = updatedItem.MinimumBid;
             item.BidIncrement = updatedItem.BidIncrement;
-            item.BidStatus = updatedItem.BidStatus;
             item.BidStartDate = updatedItem.BidStartDate;
             item.BidEndDate = updatedItem.BidEndDate;
-            item.UpdatedAt = updatedItem.UpdatedAt;
+
+            item.ImagePath = String.IsNullOrEmpty(updatedItem.ImagePath) ? item.ImagePath : updatedItem.ImagePath;
+            item.DocumentPath = String.IsNullOrEmpty(updatedItem.DocumentPath) ? item.DocumentPath : updatedItem.DocumentPath;
 
             try
             {
@@ -220,6 +218,12 @@ namespace API.Controllers
 
             try
             {
+                var bids = _context.Bids.Where(b => b.ItemId == id);
+                _context.Bids.RemoveRange(bids);
+
+                // Save changes for updating bids
+                await _context.SaveChangesAsync();
+
                 // Remove the item from the DbContext
                 _context.Items.Remove(item);
 
