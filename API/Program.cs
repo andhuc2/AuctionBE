@@ -89,6 +89,8 @@ builder.Services.AddSwaggerGen(c =>
         });
 });
 
+builder.Services.AddHostedService<CronJob>();
+
 
 var app = builder.Build();
 

@@ -69,6 +69,10 @@ namespace API.Controllers
         {
             try
             {
+
+                if (string.IsNullOrEmpty(dto.Email) || !dto.Email.Contains("@"))
+                    return new Response<bool>(false, "Invalid email format.", false);
+
                 // Check if the user already exists
                 var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
                 if (existingUser != null)
