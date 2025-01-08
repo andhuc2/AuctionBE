@@ -106,6 +106,11 @@ namespace API.Controllers
                     return new Response<bool>(false, "Item not found", false);
                 }
 
+                if (item.SellerId == userId)
+                {
+                    return new Response<bool>(false, "Cant bid your own item!", false);
+                }
+
                 var currentTime = DateTime.Now;
                 if (item.BidStartDate.HasValue && currentTime < item.BidStartDate.Value)
                 {

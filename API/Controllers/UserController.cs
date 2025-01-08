@@ -58,6 +58,37 @@ namespace API.Controllers
             return new Response<User>(true, "User fetched successfully.", user);
         }
 
+        // GET: api/User/Profile/{id}
+        [HttpGet("Profile/{id}")]
+        [Authorize]
+        public async Task<Response<User>> GetUserProfile(int? id)
+        {
+            int userId = JwtMiddleware.GetUserId(HttpContext);
+            if (id == null) id = userId;
+
+            var user = await _context.Users.Where(u => u.Id == id).FirstOrDefaultAsync();
+            if (user == null)
+            {
+                return new Response<User>(false, "User not found", null);
+            }
+
+            user.Password = null;
+            user.Items = await _context.Items.Where(i => i.SellerId == id).ToListAsync();
+            foreach (var item in user.Items) item.Seller = null;
+
+            if (id == userId)
+            {
+                user.Bids = await _context.Bids.Where(i => i.BidderId == id).ToListAsync();
+                foreach (var bid in user.Bids)
+                {
+                    bid.Bidder = null;
+                    bid.Item.Seller = null;
+                }
+            }
+
+            return new Response<User>(true, "User fetched successfully.", user);
+        }
+
         // POST: api/User
         [HttpPost]
         [Authorize("Admin")]
