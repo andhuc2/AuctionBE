@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using NET_base.Models.Common;
+using API.Utils;
 
 namespace API.Controllers
 {
@@ -65,12 +66,31 @@ namespace API.Controllers
         {
             try
             {
-                int userId = JwtMiddleware.GetUserId(HttpContext);
+                int? userId = JwtMiddleware.GetUserId(HttpContext);
+
+                var reportedUser = await _context.Users.Where(u => u.Id == newReport.UserId).FirstOrDefaultAsync();
+                if (reportedUser == null)
+                {
+                    return new Response<bool>(false, "User not found", false);
+                }
+
+                var reportUser = await _context.Users.Where(u => u.Id == userId).FirstOrDefaultAsync();
+                if (userId == null || reportUser == null)
+                {
+                    return new Response<bool>(false, "User not found", false);
+                }
+
                 newReport.CreatedBy = userId;
                 newReport.CreatedAt = DateTime.UtcNow;
 
                 await _context.Reports.AddAsync(newReport);
                 await _context.SaveChangesAsync();
+
+                var admins = await _context.Users.Where(u => u.Role == Constant.ADMIN_ROLE).ToListAsync();
+                foreach (var admin in admins)
+                {
+                    EmailService.SendMailAsync(admin.Email, "New Report Submitted", $"Report from user {reportUser.Username}: {newReport.Content}");
+                }
 
                 return new Response<bool>(true, "Report added successfully.", true);
             }
