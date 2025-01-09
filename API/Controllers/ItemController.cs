@@ -128,7 +128,7 @@ namespace API.Controllers
         [HttpGet("{id}")]
         public async Task<Response<Item>> GetItemById(int id)
         {
-            var item = await _context.Items.Include(i => i.Bids).Include(i => i.Seller).FirstOrDefaultAsync(i => i.Id == id);
+            var item = await _context.Items.Include(i => i.Bids).ThenInclude(b => b.Bidder).Include(i => i.Seller).FirstOrDefaultAsync(i => i.Id == id);
             if (item == null)
             {
                 return new Response<Item>(false, "Item not found", null);
@@ -145,7 +145,11 @@ namespace API.Controllers
             foreach (var bid in item?.Bids)
             {
                 bid.Item = null;
-                bid.Bidder.Password = null;
+                if (bid.Bidder != null)
+                {
+                    bid.Bidder.Password = null;
+                    bid.Bidder.Bids = null;
+                }
             }
 
             return new Response<Item>(true, "Item fetched successfully.", item);

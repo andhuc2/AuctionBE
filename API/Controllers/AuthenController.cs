@@ -86,7 +86,10 @@ namespace API.Controllers
                 var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
                 if (existingUser != null)
                 {
-                    return new Response<bool>(false, "User already exists with the given email", false);
+                    if (existingUser.Token == null)
+                        return new Response<bool>(false, "User already exists with the given email", false);
+                    else
+                        return new Response<bool>(true, "User already registered, just verify email.", true);
                 }
 
                 string token = new Random().Next(10000000, 100000000).ToString();

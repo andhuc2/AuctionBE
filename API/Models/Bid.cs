@@ -11,7 +11,7 @@ namespace API.Models
         public decimal? BidAmount { get; set; }
         public DateTime? BidDate { get; set; }
 
-        public virtual User? Bidder { get; set; } = null!;
-        public virtual Item? Item { get; set; } = null!;
+        public virtual User? Bidder { get; set; }
+        public virtual Item? Item { get; set; }
     }
 }
