@@ -25,6 +25,8 @@ namespace API.Models
         public bool? IsDeleted { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        public string? Token { get; set; }
+        public int Credit { get; set; } = 0;
 
         public virtual ICollection<Bid> Bids { get; set; }
         public virtual ICollection<Item> Items { get; set; }

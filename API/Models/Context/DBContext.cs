@@ -308,6 +308,12 @@ namespace API.Models.Context
                 entity.Property(e => e.Username)
                     .HasMaxLength(100)
                     .HasColumnName("username");
+
+                entity.Property(e => e.Credit).HasColumnName("credit");
+
+                entity.Property(e => e.Token)
+                    .HasMaxLength(20)
+                    .HasColumnName("token");
             });
 
             OnModelCreatingPartial(modelBuilder);
