@@ -1,18 +1,22 @@
-﻿using API.Models;
-using API.Models.Context;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using System.Threading.Tasks;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+
+using API.Models;
+using API.Models.Context;
+using API.Utils;
+
 using NET_base.Models;
 using NET_base.Models.Common;
 using NET_base.Models.DTO;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace API.Controllers
 {
@@ -49,7 +53,12 @@ namespace API.Controllers
 
                 if (user.IsDeleted == true)
                 {
-                    return new Response<string>(false, "You hase been banned!", null);
+                    return new Response<string>(false, "You has been banned!", null);
+                }
+
+                if (user.Token != null)
+                {
+                    return new Response<string>(false, "Please verify your email address first.", null);
                 }
 
                 var token = GenerateJwtToken(user);
@@ -80,19 +89,39 @@ namespace API.Controllers
                     return new Response<bool>(false, "User already exists with the given email", false);
                 }
 
+                string token = new Random().Next(10000000, 100000000).ToString();
+
                 // Create a new user
                 var newUser = new User
                 {
-                    Username = dto.Email,
+                    Username = dto.Email.Split("@").First(),
                     Email = dto.Email,
                     Password = HashPassword(dto.Password),
-                    FullName = dto.Email,
+                    FullName = dto.Email.Split("@").First(),
                     Role = Constant.USER_ROLE,
-                    IsDeleted = false
+                    IsDeleted = false,
+                    Token = token,
                 };
 
                 _context.Users.Add(newUser);
                 await _context.SaveChangesAsync();
+
+                EmailService.SendMailAsync(
+                    dto.Email,
+                    "Verify Your Email Address",
+                    $@"
+                    Dear {newUser.Username},
+
+                    Thank you for registering with our service. To complete your registration, please verify your email address.
+
+                    Your verification code is: {token}
+
+                    Please enter this code on the verification page to activate your account. If you did not register for this account, please ignore this email.
+
+                    Regards,  
+                    Auction Team
+                ");
+
 
                 return new Response<bool>(true, "User registered successfully.", true);
             }
@@ -100,6 +129,30 @@ namespace API.Controllers
             {
                 // Log the exception if needed
                 return new Response<bool>(false, "An error occurred during registration", false);
+            }
+        }
+
+        [HttpPost("verify")]
+        [AllowAnonymous]
+        public async Task<Response<bool>> VerifyEmail(VerifyDTO dto)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email && u.Token == dto.Token);
+
+                if (user == null)
+                {
+                    return new Response<bool>(false, "Invalid token or email.", false);
+                }
+
+                user.Token = null;
+                await _context.SaveChangesAsync();
+
+                return new Response<bool>(true, "Email verified successfully.", true);
+            }
+            catch (Exception ex)
+            {
+                return new Response<bool>(false, "An error occurred during email verification", false);
             }
         }
 

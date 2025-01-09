@@ -138,6 +138,7 @@ namespace API.Controllers
             item.Seller.Notifications = null;
             item.Seller.RatingRatees = null;
             item.Seller.RatingRaters = null;
+            item.Seller.Reports = null;
             item.Seller.Items = null;
             item.Seller.Password = null;
 

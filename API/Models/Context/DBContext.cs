@@ -23,6 +23,8 @@ namespace API.Models.Context
         public virtual DbSet<Rating> Ratings { get; set; } = null!;
         public virtual DbSet<User> Users { get; set; } = null!;
 
+        public virtual DbSet<Report> Reports { get; set; } = null!;
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
@@ -315,6 +317,30 @@ namespace API.Models.Context
                     .HasMaxLength(20)
                     .HasColumnName("token");
             });
+
+            modelBuilder.Entity<Report>(entity =>
+            {
+                entity.ToTable("reports");
+
+                entity.HasIndex(e => e.UserId, "FK_user");
+
+                entity.Property(e => e.Id).HasColumnName("id");
+
+                entity.Property(e => e.Content)
+                    .HasColumnType("text")
+                    .HasColumnName("content");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnType("timestamp")
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("created_by");
+
+                entity.Property(e => e.UserId).HasColumnName("user_id");
+            });
+
 
             OnModelCreatingPartial(modelBuilder);
         }

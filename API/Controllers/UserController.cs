@@ -60,11 +60,9 @@ namespace API.Controllers
 
         // GET: api/User/Profile/{id}
         [HttpGet("Profile/{id}")]
-        [Authorize]
-        public async Task<Response<User>> GetUserProfile(int? id)
+        public async Task<Response<User>> GetUserProfile(int id)
         {
             int userId = JwtMiddleware.GetUserId(HttpContext);
-            if (id == null) id = userId;
 
             var user = await _context.Users.Where(u => u.Id == id).FirstOrDefaultAsync();
             if (user == null)

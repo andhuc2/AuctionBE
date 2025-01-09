@@ -71,9 +71,9 @@ public class CronJob : BackgroundService
                     Auction Team
                 ";
 
-                            await EmailService.SendMailAsync(highestBid.Bidder.Email, "Auction Won - Congratulations!", bidderEmailContent);
+                await EmailService.SendMailAsync(highestBid.Bidder.Email, "Auction Won - Congratulations!", bidderEmailContent);
 
-                            var sellerEmailContent = $@"
+                var sellerEmailContent = $@"
                     Hello {item.Seller.Username},
         
                     Your auction for the item titled '{item.Title}' has ended successfully.

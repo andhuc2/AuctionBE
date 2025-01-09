@@ -33,5 +33,6 @@ namespace API.Models
         public virtual ICollection<Notification> Notifications { get; set; }
         public virtual ICollection<Rating> RatingRatees { get; set; }
         public virtual ICollection<Rating> RatingRaters { get; set; }
+        public virtual ICollection<Report> Reports { get; set; }
     }
 }
