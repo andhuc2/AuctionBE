@@ -147,7 +147,7 @@ namespace API.Controllers
                     user.Credit += transaction.Amount;
                     await _context.SaveChangesAsync();
 
-                    return Redirect("https://localhost:5173/home?success");
+                    return Redirect("http://localhost:5173/home?success");
                 }
                 else
                 {

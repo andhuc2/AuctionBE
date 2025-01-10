@@ -163,8 +163,15 @@ namespace API.Controllers
             try
             {
                 int userId = JwtMiddleware.GetUserId(HttpContext);
+                var user = await _context.Users.FindAsync(userId);
+                if (user == null || user.Credit < 5)
+                {
+                    throw new Exception("Not enought credit!");
+                }
 
                 newItem.SellerId = userId;
+
+                user.Credit -= 5000;
 
                 await _context.Items.AddAsync(newItem);
                 await _context.SaveChangesAsync();

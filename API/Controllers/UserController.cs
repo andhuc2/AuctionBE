@@ -64,24 +64,18 @@ namespace API.Controllers
         {
             int userId = JwtMiddleware.GetUserId(HttpContext);
 
-            var user = await _context.Users.Where(u => u.Id == id).FirstOrDefaultAsync();
+            var user = await _context.Users.Where(u => u.Id == id).Include(u => u.Items).Include(u => u.Bids).FirstOrDefaultAsync();
             if (user == null)
             {
                 return new Response<User>(false, "User not found", null);
             }
 
             user.Password = null;
-            user.Items = await _context.Items.Where(i => i.SellerId == id).ToListAsync();
             foreach (var item in user.Items) item.Seller = null;
-
-            if (id == userId)
+            foreach (var bid in user.Bids)
             {
-                user.Bids = await _context.Bids.Where(i => i.BidderId == id).ToListAsync();
-                foreach (var bid in user.Bids)
-                {
-                    bid.Bidder = null;
-                    bid.Item.Seller = null;
-                }
+                bid.Bidder = null;
+                if (bid.Item != null) bid.Item.Seller = null;
             }
 
             return new Response<User>(true, "User fetched successfully.", user);

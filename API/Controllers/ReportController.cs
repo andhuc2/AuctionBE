@@ -80,6 +80,12 @@ namespace API.Controllers
                     return new Response<bool>(false, "User not found", false);
                 }
 
+                var report = await _context.Reports.Where(r => r.UserId == newReport.UserId  && r.CreatedBy == userId).FirstOrDefaultAsync();
+                if (report != null)
+                {
+                    return new Response<bool>(false, "Already reported!", false);
+                }
+
                 newReport.CreatedBy = userId;
                 newReport.CreatedAt = DateTime.UtcNow;
 
@@ -89,7 +95,7 @@ namespace API.Controllers
                 var admins = await _context.Users.Where(u => u.Role == Constant.ADMIN_ROLE).ToListAsync();
                 foreach (var admin in admins)
                 {
-                    EmailService.SendMailAsync(admin.Email, "New Report Submitted", $"Report from user {reportUser.Username}: {newReport.Content}");
+                    EmailService.SendMailAsync(admin.Email, "New Report Submitted", $"Report from user {reportUser.Username} to {reportedUser.Username}: {newReport.Content}");
                 }
 
                 return new Response<bool>(true, "Report added successfully.", true);
