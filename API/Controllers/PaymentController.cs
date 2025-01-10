@@ -23,6 +23,7 @@ namespace API.Controllers
 
         [HttpPost]
         [Route("pay")]
+        [Authorize]
         public async Task<Response<string>> CreatePayment(OrderInfo order)
         {
             try
@@ -33,7 +34,7 @@ namespace API.Controllers
                 string vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN";
 
                 int? userId = JwtMiddleware.GetUserId(HttpContext);
-                userId = 1;
+
                 if (order == null || userId == null)
                     return new Response<string>(false, "Bad request.", null);
 
@@ -72,19 +73,21 @@ namespace API.Controllers
 
         [HttpGet]
         [Route("notify")]
-        public async Task<Response<bool>> PaymentNotify()
+        public async Task<IActionResult> PaymentNotify()
         {
             try
             {
+                // Check if query parameters are present
                 if (Request.Query.Count == 0)
                 {
-                    return new Response<bool>(false, "Input data required", false);
+                    return BadRequest(new Response<bool>(false, "Input data required", false));
                 }
 
                 string vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN";
                 var vnpayData = Request.Query;
                 VnPayLibrary vnpay = new VnPayLibrary();
 
+                // Add query parameters to VnPayLibrary
                 foreach (var item in vnpayData)
                 {
                     if (!string.IsNullOrEmpty(item.Value) && item.Key.StartsWith("vnp_"))
@@ -93,55 +96,71 @@ namespace API.Controllers
                     }
                 }
 
+                // Parse and validate amount
                 if (!long.TryParse(vnpay.GetResponseData("vnp_Amount"), out long vnp_Amount))
                 {
-                    return new Response<bool>(false, "Invalid amount", false);
+                    return BadRequest(new Response<bool>(false, "Invalid amount", false));
                 }
                 vnp_Amount /= 100;
 
+                // Retrieve response data
                 string vnp_ResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
                 string vnp_TransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
                 string vnp_SecureHash = vnpay.GetResponseData("vnp_SecureHash");
                 string vnp_TxnRef = vnpay.GetResponseData("vnp_TxnRef");
 
+                // Validate secure hash
                 if (string.IsNullOrEmpty(vnp_SecureHash))
                 {
-                    return new Response<bool>(false, "Invalid signature", false);
+                    return BadRequest(new Response<bool>(false, "Invalid signature", false));
                 }
 
+                // Verify signature
                 bool checkSignature = vnpay.ValidateSignature(vnp_SecureHash, vnp_HashSecret);
                 if (!checkSignature)
                 {
-                    return new Response<bool>(false, "Invalid signature", false);
+                    return BadRequest(new Response<bool>(false, "Invalid signature", false));
                 }
 
-                var transaction = await _context.Transactions.Where(t => t.OrderId == vnp_TxnRef).FirstOrDefaultAsync();
-                if (string.IsNullOrEmpty(vnp_TxnRef) || transaction == null || transaction.Status != Constant.PENDING)
+                // Retrieve transaction from database
+                var transaction = await _context.Transactions
+                    .FirstOrDefaultAsync(t => t.OrderId == vnp_TxnRef);
+
+                if (transaction == null || transaction.Status != Constant.PENDING)
                 {
-                    return new Response<bool>(false, "Invalid order", false);
+                    return NotFound(new Response<bool>(false, "Invalid order or order already processed", false));
                 }
 
-                var user = await _context.Users.Where(t => t.Id == transaction.UserId).FirstOrDefaultAsync();
+                // Retrieve user associated with the transaction
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(t => t.Id == transaction.UserId);
+
                 if (user == null)
                 {
-                    return new Response<bool>(false, "Invalid order", false);
+                    return NotFound(new Response<bool>(false, "User not found", false));
                 }
 
-                transaction.Status = Constant.SUCCESS;
-                user.Credit += transaction.Amount;
-                await _context.SaveChangesAsync();
-
+                // Update transaction and user credit
                 if (vnp_ResponseCode == "00" && vnp_TransactionStatus == "00")
                 {
-                    return new Response<bool>(true, "Success", true);
+                    transaction.Status = Constant.SUCCESS;
+                    user.Credit += transaction.Amount;
+                    await _context.SaveChangesAsync();
+
+                    return Redirect("https://localhost:5173/home?success");
                 }
                 else
                 {
-                    throw new Exception("Fail");
+                    // Handle failed payment
+                    transaction.Status = Constant.FAILED;
+                    await _context.SaveChangesAsync();
+
+                    return BadRequest(new Response<bool>(false, "Payment failed", false));
                 }
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
-                return new Response<bool>(false, e.Message, false);
+                return StatusCode(500, new Response<bool>(false, e.Message, false));
             }
         }
     }

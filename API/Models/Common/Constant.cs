@@ -34,6 +34,7 @@
         // Status
         public const string PENDING = "pending";
         public const string SUCCESS = "success";
+        public const string FAILED = "failed";
 
     }
 }
