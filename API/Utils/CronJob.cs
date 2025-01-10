@@ -33,25 +33,27 @@ public class CronJob : BackgroundService
 
         _logger.LogInformation("Running scheduled task at: {time}", DateTimeOffset.Now);
 
-        var items = await _context.Items
+        try
+        {
+            var items = await _context.Items
             .Where(item => item.BidStatus == null && item.BidEndDate <= DateTime.UtcNow)
             .Include(item => item.Seller)
             .ToListAsync();
 
-        foreach (var item in items)
-        {
-            item.BidStatus = "Ended";
-            item.UpdatedAt = DateTime.UtcNow;
-
-            var highestBid = await _context.Bids
-                .Where(bid => bid.ItemId == item.Id && bid.BidAmount.HasValue)
-                .Include(bid => bid.Bidder)
-                .OrderByDescending(bid => bid.BidAmount)
-                .FirstOrDefaultAsync();
-
-            if (highestBid != null)
+            foreach (var item in items)
             {
-                var bidderEmailContent = $@"
+                item.BidStatus = "Ended";
+                item.UpdatedAt = DateTime.UtcNow;
+
+                var highestBid = await _context.Bids
+                    .Where(bid => bid.ItemId == item.Id && bid.BidAmount.HasValue)
+                    .Include(bid => bid.Bidder)
+                    .OrderByDescending(bid => bid.BidAmount)
+                    .FirstOrDefaultAsync();
+
+                if (highestBid != null)
+                {
+                    var bidderEmailContent = $@"
                     Hello {highestBid.Bidder.Username},
         
                     Congratulations! You have won the auction for the item titled '{item.Title}'.
@@ -71,9 +73,9 @@ public class CronJob : BackgroundService
                     Auction Team
                 ";
 
-                await EmailService.SendMailAsync(highestBid.Bidder.Email, "Auction Won - Congratulations!", bidderEmailContent);
+                    await EmailService.SendMailAsync(highestBid.Bidder.Email, "Auction Won - Congratulations!", bidderEmailContent);
 
-                var sellerEmailContent = $@"
+                    var sellerEmailContent = $@"
                     Hello {item.Seller.Username},
         
                     Your auction for the item titled '{item.Title}' has ended successfully.
@@ -93,13 +95,17 @@ public class CronJob : BackgroundService
                     Auction Team
                 ";
 
-                await EmailService.SendMailAsync(item.Seller.Email, "Auction Ended - Contact Winner", sellerEmailContent);
+                    await EmailService.SendMailAsync(item.Seller.Email, "Auction Ended - Contact Winner", sellerEmailContent);
+                }
+
+                _context.Update(item);
             }
 
-            _context.Update(item);
+            await _context.SaveChangesAsync();
+        } catch(Exception e)
+        {
+            _logger.LogError("Job error: ", e.Message);
         }
-
-        await _context.SaveChangesAsync();
 
     }
 

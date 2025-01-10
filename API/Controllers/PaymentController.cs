@@ -1,11 +1,10 @@
 ﻿using API.Models;
+using API.Models.Context;
 using API.Utils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using NET_base.Models.Common;
-using System;
-using static System.Net.WebRequestMethods;
 
 namespace API.Controllers
 {
@@ -14,9 +13,9 @@ namespace API.Controllers
     public class PaymentController : ControllerBase
     {
         private readonly IConfiguration _configuration;
-        private readonly DbContext _context;
+        private readonly DBContext _context;
 
-        public PaymentController(IConfiguration configuration, DbContext context)
+        public PaymentController(IConfiguration configuration, DBContext context)
         {
             _configuration = configuration;
             _context = context;
@@ -24,40 +23,56 @@ namespace API.Controllers
 
         [HttpPost]
         [Route("pay")]
-        public Response<string> CreatePayment(OrderInfo order)
+        public async Task<Response<string>> CreatePayment(OrderInfo order)
         {
-            string vnp_Returnurl = "http://localhost:5001/api/Payment/notify";
-            string vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-            string vnp_TmnCode = "CGXZLS0Z";
-            string vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN";
+            try
+            {
+                string vnp_Returnurl = "http://localhost:5001/api/Payment/notify";
+                string vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+                string vnp_TmnCode = "CGXZLS0Z";
+                string vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN";
 
-            if (order == null)
-                return new Response<string>(false, "Order information is required.", null);
+                int? userId = JwtMiddleware.GetUserId(HttpContext);
+                userId = 1;
+                if (order == null || userId == null)
+                    return new Response<string>(false, "Bad request.", null);
 
-            string OrderId = DateTime.Now.Ticks.ToString();
+                string OrderId = DateTime.Now.Ticks.ToString();
 
-            VnPayLibrary vnpay = new VnPayLibrary();
-            vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
-            vnpay.AddRequestData("vnp_Command", "pay");
-            vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode);
-            vnpay.AddRequestData("vnp_Amount", (order.Amount * 100).ToString()); // Convert to cents
-            vnpay.AddRequestData("vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss"));
-            vnpay.AddRequestData("vnp_CurrCode", "VND");
-            vnpay.AddRequestData("vnp_IpAddr", VnPayLibrary.GetIpAddress(HttpContext));
-            vnpay.AddRequestData("vnp_Locale", "vn");
-            vnpay.AddRequestData("vnp_OrderInfo", "Thanh toan don hang:" + OrderId);
-            vnpay.AddRequestData("vnp_OrderType", "other");
-            vnpay.AddRequestData("vnp_ReturnUrl", vnp_Returnurl);
-            vnpay.AddRequestData("vnp_TxnRef", OrderId);
+                Transaction transaction = new Transaction();
+                transaction.Amount = (decimal)order.Amount;
+                transaction.UserId = (int)userId;
+                transaction.OrderId = OrderId;
 
-            string paymentUrl = vnpay.CreateRequestUrl(vnp_Url, vnp_HashSecret);
+                await _context.Transactions.AddAsync(transaction);
+                await _context.SaveChangesAsync();
 
-            return new Response<string>(true, "Success", paymentUrl);
+                VnPayLibrary vnpay = new VnPayLibrary();
+                vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
+                vnpay.AddRequestData("vnp_Command", "pay");
+                vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode);
+                vnpay.AddRequestData("vnp_Amount", (order.Amount * 100).ToString()); // Convert to cents
+                vnpay.AddRequestData("vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss"));
+                vnpay.AddRequestData("vnp_CurrCode", "VND");
+                vnpay.AddRequestData("vnp_IpAddr", VnPayLibrary.GetIpAddress(HttpContext));
+                vnpay.AddRequestData("vnp_Locale", "vn");
+                vnpay.AddRequestData("vnp_OrderInfo", "Thanh toan don hang:" + OrderId);
+                vnpay.AddRequestData("vnp_OrderType", "other");
+                vnpay.AddRequestData("vnp_ReturnUrl", vnp_Returnurl);
+                vnpay.AddRequestData("vnp_TxnRef", OrderId);
+
+                string paymentUrl = vnpay.CreateRequestUrl(vnp_Url, vnp_HashSecret);
+
+                return new Response<string>(true, "Success", paymentUrl);
+            } catch (Exception ex)
+            {
+                return new Response<string>(true, ex.Message, null);
+            }
         }
 
         [HttpGet]
         [Route("notify")]
-        public Response<bool> PaymentNotify()
+        public async Task<Response<bool>> PaymentNotify()
         {
             try
             {
@@ -86,7 +101,8 @@ namespace API.Controllers
 
                 string vnp_ResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
                 string vnp_TransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
-                string vnp_SecureHash = Request.Query["vnp_SecureHash"];
+                string vnp_SecureHash = vnpay.GetResponseData("vnp_SecureHash");
+                string vnp_TxnRef = vnpay.GetResponseData("vnp_TxnRef");
 
                 if (string.IsNullOrEmpty(vnp_SecureHash))
                 {
@@ -99,6 +115,21 @@ namespace API.Controllers
                     return new Response<bool>(false, "Invalid signature", false);
                 }
 
+                var transaction = await _context.Transactions.Where(t => t.OrderId == vnp_TxnRef).FirstOrDefaultAsync();
+                if (string.IsNullOrEmpty(vnp_TxnRef) || transaction == null || transaction.Status != Constant.PENDING)
+                {
+                    return new Response<bool>(false, "Invalid order", false);
+                }
+
+                var user = await _context.Users.Where(t => t.Id == transaction.UserId).FirstOrDefaultAsync();
+                if (user == null)
+                {
+                    return new Response<bool>(false, "Invalid order", false);
+                }
+
+                transaction.Status = Constant.SUCCESS;
+                user.Credit += transaction.Amount;
+                await _context.SaveChangesAsync();
 
                 if (vnp_ResponseCode == "00" && vnp_TransactionStatus == "00")
                 {

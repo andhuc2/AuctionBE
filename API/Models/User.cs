@@ -26,7 +26,7 @@ namespace API.Models
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public string? Token { get; set; }
-        public int? Credit { get; set; } = 0;
+        public decimal? Credit { get; set; } = 0;
 
         public virtual ICollection<Bid> Bids { get; set; }
         public virtual ICollection<Item> Items { get; set; }

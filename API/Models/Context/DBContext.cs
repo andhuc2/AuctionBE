@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using NET_base.Models.Common;
 
 namespace API.Models.Context
 {
@@ -22,7 +24,7 @@ namespace API.Models.Context
         public virtual DbSet<Notification> Notifications { get; set; } = null!;
         public virtual DbSet<Rating> Ratings { get; set; } = null!;
         public virtual DbSet<User> Users { get; set; } = null!;
-
+        public virtual DbSet<Transaction> Transactions { get; set; } = null!;
         public virtual DbSet<Report> Reports { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -311,7 +313,9 @@ namespace API.Models.Context
                     .HasMaxLength(100)
                     .HasColumnName("username");
 
-                entity.Property(e => e.Credit).HasColumnName("credit");
+                entity.Property(e => e.Credit)
+                    .HasColumnName("credit")
+                    .HasColumnType("decimal(18, 2)");
 
                 entity.Property(e => e.Token)
                     .HasMaxLength(20)
@@ -339,6 +343,23 @@ namespace API.Models.Context
                     .HasColumnName("created_by");
 
                 entity.Property(e => e.UserId).HasColumnName("user_id");
+            });
+
+            modelBuilder.Entity<Transaction>(entity =>
+            {
+                entity.ToTable("transactions");
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.OrderId).HasColumnName("order_id");
+                entity.Property(t => t.UserId).HasColumnName("user_id");
+                entity.Property(t => t.Amount).HasColumnName("amount")
+                    .HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.Status).HasColumnName("status")
+                    .HasDefaultValue(NET_base.Models.Common.Constant.PENDING)
+                    .HasMaxLength(50);
+                entity.Property(t => t.CreatedAt)
+                    .HasColumnType("timestamp")
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
 

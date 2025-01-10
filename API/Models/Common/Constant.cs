@@ -31,5 +31,9 @@
         // Cache prefix
         public const string USER_CACHE_PREFIX = "users";
 
+        // Status
+        public const string PENDING = "pending";
+        public const string SUCCESS = "success";
+
     }
 }
