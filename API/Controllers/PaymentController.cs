@@ -1,6 +1,7 @@
 ﻿using API.Models;
 using API.Utils;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NET_base.Models.Common;
 using System;
@@ -13,15 +14,17 @@ namespace API.Controllers
     public class PaymentController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly DbContext _context;
 
-        public PaymentController(IConfiguration configuration)
+        public PaymentController(IConfiguration configuration, DbContext context)
         {
             _configuration = configuration;
+            _context = context;
         }
 
         [HttpPost]
         [Route("pay")]
-        public Response<string> CreatePayment([FromBody] OrderInfo order)
+        public Response<string> CreatePayment(OrderInfo order)
         {
             string vnp_Returnurl = "http://localhost:5001/api/Payment/notify";
             string vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
@@ -31,23 +34,21 @@ namespace API.Controllers
             if (order == null)
                 return new Response<string>(false, "Order information is required.", null);
 
-            order.OrderId = DateTime.Now.Ticks;
-            order.Status = "0"; // Order status: 0 - pending
-            order.CreatedDate = DateTime.Now;
+            string OrderId = DateTime.Now.Ticks.ToString();
 
             VnPayLibrary vnpay = new VnPayLibrary();
             vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
             vnpay.AddRequestData("vnp_Command", "pay");
             vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode);
             vnpay.AddRequestData("vnp_Amount", (order.Amount * 100).ToString()); // Convert to cents
-            vnpay.AddRequestData("vnp_CreateDate", order.CreatedDate?.ToString("yyyyMMddHHmmss"));
+            vnpay.AddRequestData("vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss"));
             vnpay.AddRequestData("vnp_CurrCode", "VND");
-            vnpay.AddRequestData("vnp_IpAddr", VnPayLibrary.GetIpAddress(HttpContext));  // Correctly passing HttpContext
+            vnpay.AddRequestData("vnp_IpAddr", VnPayLibrary.GetIpAddress(HttpContext));
             vnpay.AddRequestData("vnp_Locale", "vn");
-            vnpay.AddRequestData("vnp_OrderInfo", "Thanh toan don hang:" + order.OrderId);
+            vnpay.AddRequestData("vnp_OrderInfo", "Thanh toan don hang:" + OrderId);
             vnpay.AddRequestData("vnp_OrderType", "other");
             vnpay.AddRequestData("vnp_ReturnUrl", vnp_Returnurl);
-            vnpay.AddRequestData("vnp_TxnRef", order.OrderId.ToString());
+            vnpay.AddRequestData("vnp_TxnRef", OrderId);
 
             string paymentUrl = vnpay.CreateRequestUrl(vnp_Url, vnp_HashSecret);
 
@@ -56,12 +57,16 @@ namespace API.Controllers
 
         [HttpGet]
         [Route("notify")]
-        public IActionResult PaymentNotify()
+        public Response<bool> PaymentNotify()
         {
-            string returnContent = string.Empty;
-            if (Request.Query.Count > 0)
+            try
             {
-                string vnp_HashSecret = _configuration["vnp_HashSecret"];
+                if (Request.Query.Count == 0)
+                {
+                    return new Response<bool>(false, "Input data required", false);
+                }
+
+                string vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN";
                 var vnpayData = Request.Query;
                 VnPayLibrary vnpay = new VnPayLibrary();
 
@@ -73,73 +78,40 @@ namespace API.Controllers
                     }
                 }
 
-                long orderId = Convert.ToInt64(vnpay.GetResponseData("vnp_TxnRef"));
-                long vnp_Amount = Convert.ToInt64(vnpay.GetResponseData("vnp_Amount")) / 100;
-                long vnpayTranId = Convert.ToInt64(vnpay.GetResponseData("vnp_TransactionNo"));
+                if (!long.TryParse(vnpay.GetResponseData("vnp_Amount"), out long vnp_Amount))
+                {
+                    return new Response<bool>(false, "Invalid amount", false);
+                }
+                vnp_Amount /= 100;
+
                 string vnp_ResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
                 string vnp_TransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
                 string vnp_SecureHash = Request.Query["vnp_SecureHash"];
 
-                bool checkSignature = vnpay.ValidateSignature(vnp_SecureHash, vnp_HashSecret);
-                if (checkSignature)
+                if (string.IsNullOrEmpty(vnp_SecureHash))
                 {
-                    // Simulating the order retrieval from the database
-                    OrderInfo order = GetOrderFromDatabase(orderId); // Simulate database lookup
-                    if (order != null)
-                    {
-                        if (order.Amount == vnp_Amount)
-                        {
-                            if (order.Status == "0")
-                            {
-                                if (vnp_ResponseCode == "00" && vnp_TransactionStatus == "00")
-                                {
-                                    order.Status = "1"; // Payment successful
-                                    returnContent = "{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}";
-                                }
-                                else
-                                {
-                                    order.Status = "2"; // Payment failed
-                                    returnContent = "{\"RspCode\":\"02\",\"Message\":\"Payment failed\"}";
-                                }
-                            }
-                            else
-                            {
-                                returnContent = "{\"RspCode\":\"02\",\"Message\":\"Order already confirmed\"}";
-                            }
-                        }
-                        else
-                        {
-                            returnContent = "{\"RspCode\":\"04\",\"Message\":\"Invalid amount\"}";
-                        }
-                    }
-                    else
-                    {
-                        returnContent = "{\"RspCode\":\"01\",\"Message\":\"Order not found\"}";
-                    }
+                    return new Response<bool>(false, "Invalid signature", false);
+                }
+
+                bool checkSignature = vnpay.ValidateSignature(vnp_SecureHash, vnp_HashSecret);
+                if (!checkSignature)
+                {
+                    return new Response<bool>(false, "Invalid signature", false);
+                }
+
+
+                if (vnp_ResponseCode == "00" && vnp_TransactionStatus == "00")
+                {
+                    return new Response<bool>(true, "Success", true);
                 }
                 else
                 {
-                    returnContent = "{\"RspCode\":\"97\",\"Message\":\"Invalid signature\"}";
+                    throw new Exception("Fail");
                 }
-            }
-            else
+            } catch (Exception e)
             {
-                returnContent = "{\"RspCode\":\"99\",\"Message\":\"Input data required\"}";
+                return new Response<bool>(false, e.Message, false);
             }
-
-            return Ok(returnContent);
-        }
-
-        private OrderInfo GetOrderFromDatabase(long orderId)
-        {
-            // Simulating an order lookup from the database
-            return new OrderInfo
-            {
-                OrderId = orderId,
-                Amount = 100000, // Example amount in VND (1000 VND)
-                Status = "0",    // Simulating an order with status "0" (Pending)
-                CreatedDate = DateTime.Now
-            };
         }
     }
 }
