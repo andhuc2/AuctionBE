@@ -1,6 +1,8 @@
-﻿using API.Utils;
+﻿using API.Models;
+using API.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using NET_base.Models.Common;
 using System;
 using static System.Net.WebRequestMethods;
 
@@ -19,15 +21,15 @@ namespace API.Controllers
 
         [HttpPost]
         [Route("pay")]
-        public IActionResult CreatePayment([FromBody] OrderInfo order)
+        public Response<string> CreatePayment([FromBody] OrderInfo order)
         {
             string vnp_Returnurl = "http://localhost:5001/api/Payment/notify";
-            string vnp_Url = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
+            string vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
             string vnp_TmnCode = "CGXZLS0Z";
             string vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN";
 
             if (order == null)
-                return BadRequest("Order information is required.");
+                return new Response<string>(false, "Order information is required.", null);
 
             order.OrderId = DateTime.Now.Ticks;
             order.Status = "0"; // Order status: 0 - pending
@@ -38,7 +40,7 @@ namespace API.Controllers
             vnpay.AddRequestData("vnp_Command", "pay");
             vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode);
             vnpay.AddRequestData("vnp_Amount", (order.Amount * 100).ToString()); // Convert to cents
-            vnpay.AddRequestData("vnp_CreateDate", order.CreatedDate.ToString("yyyyMMddHHmmss"));
+            vnpay.AddRequestData("vnp_CreateDate", order.CreatedDate?.ToString("yyyyMMddHHmmss"));
             vnpay.AddRequestData("vnp_CurrCode", "VND");
             vnpay.AddRequestData("vnp_IpAddr", VnPayLibrary.GetIpAddress(HttpContext));  // Correctly passing HttpContext
             vnpay.AddRequestData("vnp_Locale", "vn");
@@ -49,7 +51,7 @@ namespace API.Controllers
 
             string paymentUrl = vnpay.CreateRequestUrl(vnp_Url, vnp_HashSecret);
 
-            return Redirect(paymentUrl);
+            return new Response<string>(true, "Success", paymentUrl);
         }
 
         [HttpGet]
