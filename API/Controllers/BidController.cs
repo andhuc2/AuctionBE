@@ -111,6 +111,12 @@ namespace API.Controllers
                     return new Response<bool>(false, "Cant bid your own item!", false);
                 }
 
+                var user = await _context.Users.Where(u => u.Id == userId).FirstOrDefaultAsync();
+                if (user==null || user.Credit < 1000)
+                {
+                    return new Response<bool>(false, "Insufficient Credits: You need at least 1 credit to place bid. Please recharge your credits.", false);
+                }
+
                 var currentTime = DateTime.Now;
                 if (item.BidStartDate.HasValue && currentTime < item.BidStartDate.Value)
                 {
