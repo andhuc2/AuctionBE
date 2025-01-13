@@ -81,6 +81,33 @@ namespace API.Controllers
             return new Response<User>(true, "User fetched successfully.", user);
         }
 
+        // PUT: api/User/Profile
+        [HttpPut("Profile")]
+        [Authorize]
+        public async Task<Response<bool>> UpdateProfile(User updatedUser)
+        {
+            var user = await _context.Users.FindAsync(updatedUser.Id);
+            if (user == null)
+            {
+                return new Response<bool>(false, "User not found", false);
+            }
+
+            user.FullName = updatedUser.FullName;
+            user.Phone = updatedUser.Phone;
+            user.Address = updatedUser.Address;
+
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+                return new Response<bool>(true, "User updated successfully.", true);
+            }
+            catch (Exception ex)
+            {
+                return new Response<bool>(false, $"Error updating user: {ex.Message}", false);
+            }
+        }
+
         // POST: api/User
         [HttpPost]
         [Authorize("Admin")]
