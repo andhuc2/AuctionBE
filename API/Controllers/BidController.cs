@@ -150,6 +150,7 @@ namespace API.Controllers
 
                 // Add the bid
                 await _context.Bids.AddAsync(newBid);
+                user.Credit -= 2000;
                 await _context.SaveChangesAsync();
 
                 return new Response<bool>(true, "Bid placed successfully.", true);
