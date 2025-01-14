@@ -147,6 +147,8 @@ namespace API.Controllers
                     user.Credit += transaction.Amount;
                     await _context.SaveChangesAsync();
 
+                    EmailService.SendMailAsync(user.Email, "Recharge success", $"Recharge successful!\nHi {user.UserName},\nYour new balance: {user.Credit / 1000} credits.\nThank you!");
+
                     return Redirect("http://localhost:5173/home?success");
                 }
                 else
