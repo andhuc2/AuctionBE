@@ -36,5 +36,6 @@
         public const string SUCCESS = "success";
         public const string FAILED = "failed";
 
+        public const string ENDED = "Ended";
     }
 }

@@ -5,20 +5,21 @@ using API.Models.Context;
 using API.Utils;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using NET_base.Models.Common;
 
 public class CronJob : BackgroundService
 {
     private readonly ILogger<CronJob> _logger;
-    private DBContext _context;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private Timer _timer;
     private readonly int REMIND_DELAY_MINUTES = 1;
     private readonly int INTERVAL_SECOND = 15;
 
-    public CronJob(ILogger<CronJob> logger)
+    public CronJob(ILogger<CronJob> logger, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
-        _context = new DBContext();
+        _scopeFactory = scopeFactory;
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,84 +30,87 @@ public class CronJob : BackgroundService
 
     private async void DoWork(object state)
     {
-        _context = new DBContext();
-
         _logger.LogInformation("Running scheduled task at: {time}", DateTimeOffset.Now);
 
         try
         {
-            var items = await _context.Items
-            .Where(item => item.BidStatus == null && item.BidEndDate <= DateTime.UtcNow)
-            .Include(item => item.Seller)
-            .ToListAsync();
-
-            foreach (var item in items)
+            using (var scope = _scopeFactory.CreateScope())
             {
-                item.BidStatus = "Ended";
-                item.UpdatedAt = DateTime.UtcNow;
+                var _context = scope.ServiceProvider.GetRequiredService<DBContext>();
 
-                var highestBid = await _context.Bids
-                    .Where(bid => bid.ItemId == item.Id && bid.BidAmount.HasValue)
-                    .Include(bid => bid.Bidder)
-                    .OrderByDescending(bid => bid.BidAmount)
-                    .FirstOrDefaultAsync();
+                var items = await _context.Items
+                    .Where(item => item.BidStatus != Constant.ENDED && item.BidEndDate <= DateTime.UtcNow)
+                    .Include(item => item.Seller)
+                    .ToListAsync();
 
-                if (highestBid != null)
+                foreach (var item in items)
                 {
-                    var bidderEmailContent = $@"
-                    Hello {highestBid.Bidder.Username},
-        
-                    Congratulations! You have won the auction for the item titled '{item.Title}'.
-        
-                    Here are the details of the item:
-                    - Title: {item.Title}
-                    - Description: {item.Description}
-                    - Final Bid Amount: {highestBid.BidAmount:C}
-        
-                    Please contact the seller to arrange payment and delivery:
-                    - Seller Name: {item.Seller.Username}
-                    - Seller Email: {item.Seller.Email}
+                    item.BidStatus = Constant.ENDED;
+                    item.UpdatedAt = DateTime.UtcNow;
 
-                    Thank you for participating in the auction!
+                    var highestBid = await _context.Bids
+                        .Where(bid => bid.ItemId == item.Id && bid.BidAmount.HasValue)
+                        .Include(bid => bid.Bidder)
+                        .OrderByDescending(bid => bid.BidAmount)
+                        .FirstOrDefaultAsync();
 
-                    Regards,
-                    Auction Team
-                ";
+                    if (highestBid != null)
+                    {
+                        var bidderEmailContent = $@"
+    Hello {highestBid.Bidder.Username},
 
-                    await EmailService.SendMailAsync(highestBid.Bidder.Email, "Auction Won - Congratulations!", bidderEmailContent);
+    Congratulations! You have won the auction for the item titled '{item.Title}'.
 
-                    var sellerEmailContent = $@"
-                    Hello {item.Seller.Username},
-        
-                    Your auction for the item titled '{item.Title}' has ended successfully.
+    Here are the details of the item:
+    - Title: {item.Title}
+    - Description: {item.Description}
+    - Final Bid Amount: {highestBid.BidAmount:C}
 
-                    Here are the details:
-                    - Title: {item.Title}
-                    - Description: {item.Description}
-                    - Winning Bid Amount: {highestBid.BidAmount:C}
-                    - Winner: {highestBid.Bidder.Username}
-                    - Winner Email: {highestBid.Bidder.Email}
-        
-                    Please contact the winner to finalize the payment and delivery process.
+    Please contact the seller to arrange payment and delivery:
+    - Seller Name: {item.Seller.Username}
+    - Seller Email: {item.Seller.Email}
 
-                    Thank you for using our auction platform!
+    Thank you for participating in the auction!
 
-                    Regards,
-                    Auction Team
-                ";
+    Regards,
+    Auction Team
+";
 
-                    await EmailService.SendMailAsync(item.Seller.Email, "Auction Ended - Contact Winner", sellerEmailContent);
+                        await EmailService.SendMailAsync(highestBid.Bidder.Email, "Auction Won - Congratulations!", bidderEmailContent);
+
+                        var sellerEmailContent = $@"
+    Hello {item.Seller.Username},
+
+    Your auction for the item titled '{item.Title}' has ended successfully.
+
+    Here are the details:
+    - Title: {item.Title}
+    - Description: {item.Description}
+    - Winning Bid Amount: {highestBid.BidAmount:C}
+    - Winner: {highestBid.Bidder.Username}
+    - Winner Email: {highestBid.Bidder.Email}
+
+    Please contact the winner to finalize the payment and delivery process.
+
+    Thank you for using our auction platform!
+
+    Regards,
+    Auction Team
+";
+
+                        await EmailService.SendMailAsync(item.Seller.Email, "Auction Ended - Contact Winner", sellerEmailContent);
+                    }
+
+                    _context.Update(item);
                 }
 
-                _context.Update(item);
+                await _context.SaveChangesAsync();
             }
-
-            await _context.SaveChangesAsync();
-        } catch(Exception e)
-        {
-            _logger.LogError("Job error: ", e.Message);
         }
-
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Job error: {Message}", e.Message);
+        }
     }
 
     public override Task StopAsync(CancellationToken stoppingToken)
