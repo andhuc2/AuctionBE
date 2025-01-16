@@ -31,5 +31,9 @@
         // Cache prefix
         public const string USER_CACHE_PREFIX = "users";
 
+        // Status
+        public const string ENDED = "Ended";
+        public const string ACTIVE = "Active";
+
     }
 }

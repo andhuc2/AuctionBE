@@ -5,20 +5,21 @@ using API.Models.Context;
 using API.Utils;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using NET_base.Models.Common;
 
 public class CronJob : BackgroundService
 {
     private readonly ILogger<CronJob> _logger;
-    private DBContext _context;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private Timer _timer;
     private readonly int REMIND_DELAY_MINUTES = 1;
     private readonly int INTERVAL_SECOND = 15;
 
-    public CronJob(ILogger<CronJob> logger)
+    public CronJob(ILogger<CronJob> logger, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
-        _context = new DBContext();
+        _scopeFactory = scopeFactory;
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,18 +30,19 @@ public class CronJob : BackgroundService
 
     private async void DoWork(object state)
     {
-        _context = new DBContext();
-
         _logger.LogInformation("Running scheduled task at: {time}", DateTimeOffset.Now);
 
+        var scope = _scopeFactory.CreateScope();
+        var _context = scope.ServiceProvider.GetRequiredService<DBContext>();
+
         var items = await _context.Items
-            .Where(item => item.BidStatus == null && item.BidEndDate <= DateTime.UtcNow)
+            .Where(item => item.BidStatus != Constant.ENDED && item.BidEndDate <= DateTime.UtcNow)
             .Include(item => item.Seller)
             .ToListAsync();
 
         foreach (var item in items)
         {
-            item.BidStatus = "Ended";
+            item.BidStatus = Constant.ENDED;
             item.UpdatedAt = DateTime.UtcNow;
 
             var highestBid = await _context.Bids
