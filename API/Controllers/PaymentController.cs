@@ -149,7 +149,7 @@ namespace API.Controllers
 
                     EmailService.SendMailAsync(user.Email, "Recharge success", $"Recharge successful!\nHi {user.Username},\nYour new balance: {user.Credit / 1000} credits.\nThank you!");
 
-                    return Redirect("http://localhost:5173/home?success");
+                    return Redirect("http://localhost:5173/profile?successP");
                 }
                 else
                 {

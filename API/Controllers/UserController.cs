@@ -5,6 +5,8 @@ using NET_base.Models.Common;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Dynamic.Core;
 using Microsoft.AspNetCore.Authorization;
+using NET_base.Models.DTO;
+using AutoMapper;
 
 namespace API.Controllers
 {
@@ -13,10 +15,12 @@ namespace API.Controllers
     public class UserController : ControllerBase
     {
         private readonly DBContext _context;
+        private readonly IMapper _mapper;
 
-        public UserController(DBContext context)
+        public UserController(DBContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/User
@@ -60,25 +64,19 @@ namespace API.Controllers
 
         // GET: api/User/Profile/{id}
         [HttpGet("Profile/{id}")]
-        public async Task<Response<User>> GetUserProfile(int id)
+        public async Task<Response<UserDTO>> GetUserProfile(int id)
         {
             int userId = JwtMiddleware.GetUserId(HttpContext);
 
             var user = await _context.Users.Where(u => u.Id == id).Include(u => u.Items).Include(u => u.Bids).FirstOrDefaultAsync();
             if (user == null)
             {
-                return new Response<User>(false, "User not found", null);
+                return new Response<UserDTO>(false, "User not found", null);
             }
 
-            user.Password = null;
-            foreach (var item in user.Items) item.Seller = null;
-            foreach (var bid in user.Bids)
-            {
-                bid.Bidder = null;
-                if (bid.Item != null) bid.Item.Seller = null;
-            }
+            UserDTO userDTO = _mapper.Map<UserDTO>(user);
 
-            return new Response<User>(true, "User fetched successfully.", user);
+            return new Response<UserDTO>(true, "User fetched successfully.", userDTO);
         }
 
         // PUT: api/User/Profile

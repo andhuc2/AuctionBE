@@ -5,6 +5,7 @@ using NET_base.Models.Common;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Dynamic.Core;
 using Microsoft.AspNetCore.Authorization;
+using API.Models.Common;
 
 namespace API.Controllers
 {
@@ -164,14 +165,14 @@ namespace API.Controllers
             {
                 int userId = JwtMiddleware.GetUserId(HttpContext);
                 var user = await _context.Users.FindAsync(userId);
-                if (user == null || user.Credit < 5)
+                if (user == null || user.Credit < Config.SELL_COST)
                 {
                     throw new Exception("Not enought credit!");
                 }
 
                 newItem.SellerId = userId;
 
-                user.Credit -= 5000;
+                user.Credit -= Config.SELL_COST * 1000;
 
                 await _context.Items.AddAsync(newItem);
                 await _context.SaveChangesAsync();

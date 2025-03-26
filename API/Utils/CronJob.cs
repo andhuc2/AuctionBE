@@ -13,7 +13,6 @@ public class CronJob : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
 
     private Timer _timer;
-    private readonly int REMIND_DELAY_MINUTES = 1;
     private readonly int INTERVAL_SECOND = 15;
 
     public CronJob(ILogger<CronJob> logger, IServiceScopeFactory scopeFactory)

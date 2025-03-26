@@ -1,14 +1,20 @@
+using API.Models;
 using API.Models.Context;
+using API.Models.DTO;
+using AutoMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NET_base.Models.Common;
+using NET_base.Models.DTO;
 using System;
 using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
+
+builder.Services.AddAutoMapper(typeof(Program));
 
 builder.Services.AddCors(options =>
 {
@@ -125,3 +131,14 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+public class AutoMapperProfile : Profile
+{
+    public AutoMapperProfile()
+    {
+        CreateMap<User, UserDTO>();
+        CreateMap<Item, ItemDTO>();
+        CreateMap<Bid, BidDTO>();
+        CreateMap<Category, CategoryDTO>();
+    }
+}

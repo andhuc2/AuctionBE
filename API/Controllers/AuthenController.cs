@@ -17,6 +17,7 @@ using API.Utils;
 using NET_base.Models;
 using NET_base.Models.Common;
 using NET_base.Models.DTO;
+using AutoMapper;
 
 namespace API.Controllers
 {
@@ -28,13 +29,15 @@ namespace API.Controllers
         private readonly IConfiguration _configuration;
         private readonly string _secret;
         private readonly int _expirationHours;
+        private readonly IMapper _mapper;
 
-        public AuthenController(IConfiguration configuration, DBContext context)
+        public AuthenController(IConfiguration configuration, DBContext context, IMapper mapper)
         {
             _configuration = configuration;
             _secret = configuration["JwtSettings:Secret"];
             _expirationHours = int.Parse(configuration["JwtSettings:ExpirationHours"]);
             _context = context;
+            _mapper = mapper;
         }
 
         // Authentication - Login
@@ -112,18 +115,17 @@ namespace API.Controllers
                 EmailService.SendMailAsync(
                     dto.Email,
                     "Verify Your Email Address",
-                    $@"
-                    Dear {newUser.Username},
+$@"
+Dear {newUser.Username},
 
-                    Thank you for registering with our service. To complete your registration, please verify your email address.
+Thank you for registering with our service. To complete your registration, please verify your email address.
 
-                    Your verification code is: {token}
+Your verification code is: {token}
 
-                    Please enter this code on the verification page to activate your account. If you did not register for this account, please ignore this email.
+Please enter this code on the verification page to activate your account. If you did not register for this account, please ignore this email.
 
-                    Regards,  
-                    Auction Team
-                ");
+Regards,  
+Auction Team");
 
 
                 return new Response<bool>(true, "User registered successfully.", true);
@@ -141,7 +143,7 @@ namespace API.Controllers
         {
             try
             {
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email && u.Token == dto.Token);
+                var user = await _context.Users.FirstOrDefaultAsync(u => (u.Email == dto.Email || u.Username == dto.Email) && u.Token == dto.Token);
 
                 if (user == null)
                 {

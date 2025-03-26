@@ -1,4 +1,5 @@
 ﻿using API.Models;
+using API.Models.Common;
 using API.Models.Context;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,7 @@ namespace API.Controllers
 
         // GET: api/Bid
         [HttpGet]
+        [Authorize("Admin")]
         public async Task<Response<PagedResult<Bid>>> GetBids([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
             var bidsQuery = _context.Bids.Include(b => b.Bidder);
@@ -47,6 +49,7 @@ namespace API.Controllers
         }
 
         // GET: api/Bid/{id}
+        [Authorize("Admin")]
         [HttpGet("{id}")]
         public async Task<Response<Bid>> GetBidById(int id)
         {
@@ -62,6 +65,7 @@ namespace API.Controllers
 
         // GET: api/Bid/item/{itemId}
         [HttpGet("item/{itemId}")]
+        [Authorize("Admin")]
         public async Task<Response<PagedResult<Bid>>> GetBidsByItem(int itemId, [FromQuery] int page = 1, [FromQuery] int size = 10)
         {
             var bidsQuery = _context.Bids.Where(b => b.ItemId == itemId).Include(b => b.Bidder).Include(b => b.Item);
@@ -112,7 +116,7 @@ namespace API.Controllers
                 }
 
                 var user = await _context.Users.Where(u => u.Id == userId).FirstOrDefaultAsync();
-                if (user==null || user.Credit < 1000)
+                if (user==null || user.Credit < Config.BID_COST)
                 {
                     return new Response<bool>(false, "Insufficient Credits: You need at least 1 credit to place bid. Please recharge your credits.", false);
                 }
@@ -150,7 +154,7 @@ namespace API.Controllers
 
                 // Add the bid
                 await _context.Bids.AddAsync(newBid);
-                user.Credit -= 2000;
+                user.Credit -= Config.BID_COST * 1000;
                 await _context.SaveChangesAsync();
 
                 return new Response<bool>(true, "Bid placed successfully.", true);
