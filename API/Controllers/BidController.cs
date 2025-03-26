@@ -1,8 +1,10 @@
 ﻿using API.Models;
 using API.Models.Common;
 using API.Models.Context;
+using API.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using NET_base.Models.Common;
 using System.Linq.Dynamic.Core;
@@ -14,18 +16,20 @@ namespace API.Controllers
     public class BidController : ControllerBase
     {
         private readonly DBContext _context;
+        private readonly IHubContext<ItemHub> _itemHub;
 
-        public BidController(DBContext context)
+        public BidController(DBContext context, IHubContext<ItemHub> itemHub)
         {
             _context = context;
+            _itemHub = itemHub;
         }
 
         // GET: api/Bid
         [HttpGet]
-        [Authorize("Admin")]
+        /*[Authorize("Admin")]*/
         public async Task<Response<PagedResult<Bid>>> GetBids([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
-            var bidsQuery = _context.Bids.Include(b => b.Bidder);
+            var bidsQuery = _context.Bids;
 
             var totalItems = await bidsQuery.CountAsync();
             var pageCount = (int)Math.Ceiling((double)totalItems / size);
@@ -156,6 +160,8 @@ namespace API.Controllers
                 await _context.Bids.AddAsync(newBid);
                 user.Credit -= Config.BID_COST * 1000;
                 await _context.SaveChangesAsync();
+
+                await _itemHub.Clients.Group($"item-{newBid.ItemId}").SendAsync("ItemUpdate", newBid.BidderId);
 
                 return new Response<bool>(true, "Bid placed successfully.", true);
             }

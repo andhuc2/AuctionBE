@@ -1,4 +1,6 @@
-﻿namespace API.Models.DTO
+﻿using NET_base.Models.DTO;
+
+namespace API.Models.DTO
 {
     public class BidDTO
     {

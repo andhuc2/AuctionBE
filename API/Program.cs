@@ -1,6 +1,7 @@
 using API.Models;
 using API.Models.Context;
 using API.Models.DTO;
+using API.Utils;
 using AutoMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -21,9 +22,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: "AllowAll",
         policy =>
         {
-            policy.AllowAnyOrigin()
+            policy.SetIsOriginAllowed(origin => true)
                 .AllowAnyMethod()
-                .AllowAnyHeader();
+                .AllowAnyHeader()
+                .AllowCredentials();
         });
 });
 
@@ -36,6 +38,8 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddDbContext<DBContext>();
+
+builder.Services.AddSignalR();
 
 builder.Services.AddAuthentication(options =>
 {
@@ -113,6 +117,8 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseCors("AllowAll");
+
+app.MapHub<ItemHub>("/signalR/ItemHub");
 
 app.UseMiddleware<JwtMiddleware>();
 
